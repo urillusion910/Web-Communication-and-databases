@@ -1,12 +1,14 @@
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from app.db import *
 
 
 app = FastAPI()
 
 @app.get("/")
 def read_root():
+    create_schema()
     return { "msg": "Hello World!", "v": "0.1" }
 
 
