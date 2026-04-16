@@ -1,0 +1,24 @@
+@apiUrl = http://127.0.0.1:8080
+
+GET {{apiUrl}}
+
+### 
+GET {{apiUrl}}/rooms
+
+### 
+GET {{apiUrl}}/rooms/2
+
+
+### List bookings
+GET {{apiUrl}}/bookings
+
+### Create booking
+POST {{apiUrl}}/bookings
+Content-Type: application/json
+
+{
+    "room_id": 2,
+    "guest_id": 1,
+    "datefrom": "2026-05-01",
+    "dateto": "2026-05-05"
+}

@@ -1,10 +1,23 @@
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from app.db import *
-
+from datetime import date
 
 app = FastAPI()
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/")
 def read_root():
@@ -16,18 +29,78 @@ def read_root():
 def read_item(item_id: int, q: str = None):
     return {"id": id, "q": q}
 
-
-# Part 1: JSON Response
 @app.get("/api/ip")
 async def get_ip_json(request: Request):
-    # request.client contains the host (IP) and port of the client
     client_ip = request.client.host
     return {"ip": client_ip}
 
-# Part Two (Optional): HTML Response
 @app.get("/ip", response_class=HTMLResponse)
 async def get_ip_html(request: Request):
     client_ip = request.client.host
-    # Using an f-string to inject the IP into the HTML tag
     html_content = f"<h1>Your public IP is {client_ip}</h1>"
     return html_content
+
+# List all rooms 
+@app.get("/rooms")
+def get_rooms(): 
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM hotel_rooms")
+        rooms = cur.fetchall()
+    return rooms
+
+# Get one room
+@app.get("/rooms/{id}")
+def get_one_room(id: int): 
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+            SELECT * 
+            FROM hotel_rooms 
+            WHERE id = %s
+        """, (id,)) # <- tuple, list is also fine: [id]
+        room = cur.fetchone()
+    return room
+
+# List all bookings 
+@app.get("/bookings")
+def get_bookings(): 
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+           SELECT * FROM hotel_bookings         
+        """)
+        b = cur.fetchall()
+    return b
+
+
+# Data model for bookings
+class Booking(BaseModel):
+    guest_id: int
+    room_id: int
+    datefrom: date
+    dateto: date
+
+# Create booking
+@app.post("/bookings")
+def create_booking(booking: Booking):
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+            INSERT INTO hotel_bookings (
+                room_id, 
+                guest_id,
+                datefrom,
+                dateto
+            ) VALUES (
+                %s, %s, %s, %s
+            ) RETURNING *
+        """, [
+            booking.room_id, 
+            booking.guest_id,
+            booking.datefrom,
+            booking.dateto
+        ])
+        new_booking = cur.fetchone()
+        
+    return { 
+        "msg": "Booking created!", 
+        "id": new_booking['id'],
+        "room_id": new_booking['room_id']
+    }
