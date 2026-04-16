@@ -65,7 +65,15 @@ def get_one_room(id: int):
 def get_bookings(): 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute("""
-           SELECT * FROM hotel_bookings         
+           SELECT
+                b.datefrom, 
+                (b.dateto - b.datefrom) AS days,
+                b.addinfo,
+                r.room_number,
+                g.firstname
+            FROM hotel_bookings b
+            JOIN hotel_rooms r ON b.room_id = r.id
+            JOIN hotel_guests g ON b.guest_id = g.id        
         """)
         b = cur.fetchall()
     return b
@@ -77,6 +85,7 @@ class Booking(BaseModel):
     room_id: int
     datefrom: date
     dateto: date
+    addinfo: str = None
 
 # Create booking
 @app.post("/bookings")
@@ -87,15 +96,17 @@ def create_booking(booking: Booking):
                 room_id, 
                 guest_id,
                 datefrom,
-                dateto
+                dateto,
+                addinfo
             ) VALUES (
-                %s, %s, %s, %s
+                %s, %s, %s, %s, %s
             ) RETURNING *
         """, [
             booking.room_id, 
             booking.guest_id,
             booking.datefrom,
-            booking.dateto
+            booking.dateto,
+            booking.addinfo
         ])
         new_booking = cur.fetchone()
         
@@ -104,3 +115,28 @@ def create_booking(booking: Booking):
         "id": new_booking['id'],
         "room_id": new_booking['room_id']
     }
+
+@app.get("/guests")
+def get_guests(): 
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+                SELECT *,
+                    (SELECT COUNT(*) 
+                    FROM hotel_bookings b 
+                    WHERE b.guest_id = g.id AND b.dateto < CURRENT_DATE
+                    ) AS previous_visits
+                FROM hotel_guests g
+            """)
+        guests = cur.fetchall()
+    return guests
+
+@app.get("/guests/{id}")
+def get_guest(id: int):
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+                SELECT COUNT(*) 
+                FROM hotel_bookings b 
+                WHERE b.guest_id = %s AND b.dateto < CURRENT_DATE
+            """, (id,))
+        guest = cur.fetchone()
+    return guest
