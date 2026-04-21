@@ -11,6 +11,7 @@ GET {{apiUrl}}/rooms/2
 
 ### List bookings
 GET {{apiUrl}}/bookings
+X-API-KEY: 76e8b11a310117f88966fd990c8c7e99fb56bcd67f397014647fe2c71825ba8e
 
 ### Create booking
 POST {{apiUrl}}/bookings
@@ -21,6 +22,14 @@ Content-Type: application/json
     "guest_id": 1,
     "datefrom": "2026-05-01",
     "dateto": "2026-05-05"
+}
+
+###
+PUT {{apiUrl}}/bookings/2
+Content-Type: application/json
+
+{
+    "stars": 4
 }
 
 ###

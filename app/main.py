@@ -1,10 +1,11 @@
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse
+from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from app.db import *
 from datetime import date
+from app.db import get_conn, create_schema
 
 app = FastAPI()
 
@@ -18,6 +19,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+def validate_key(api_key: str = Depends(api_key_header)):
+    if not api_key:
+        raise HTTPException(status_code=401, detail={"error": "API Key missing!"})
+    
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+            SELECT * FROM hotel_guests WHERE api_key = %s
+        """, [api_key] )
+        guest = cur.fetchone()
+        if not guest:
+            raise HTTPException(status_code=401, detail={"error": "Bad API Key!"})
+        return guest
 
 @app.get("/")
 def read_root():
@@ -62,7 +77,8 @@ def get_one_room(id: int):
 
 # List all bookings 
 @app.get("/bookings")
-def get_bookings(): 
+def get_bookings(guest: dict = Depends(validate_key)):
+    print(guest)
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute("""
            SELECT
@@ -70,11 +86,13 @@ def get_bookings():
                 (b.dateto - b.datefrom) AS days,
                 b.addinfo,
                 r.room_number,
-                g.firstname
+                g.firstname,
+                b.id
             FROM hotel_bookings b
             JOIN hotel_rooms r ON b.room_id = r.id
-            JOIN hotel_guests g ON b.guest_id = g.id        
-        """)
+            JOIN hotel_guests g ON b.guest_id = g.id   
+            WHERE b.guest_id = %s     
+        """, (guest["id"],))
         b = cur.fetchall()
     return b
 
@@ -115,6 +133,16 @@ def create_booking(booking: Booking):
         "id": new_booking['id'],
         "room_id": new_booking['room_id']
     }
+
+class Stars(BaseModel):
+    stars: int
+
+@app.put("/bookings/{id}")
+def put_bookings(id: int, stars: Stars): 
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+            UPDATE hotel_bookings SET stars = %s WHERE id = %s
+        """, (stars.stars, id,))
 
 @app.get("/guests")
 def get_guests(): 

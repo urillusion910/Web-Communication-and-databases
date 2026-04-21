@@ -10,6 +10,9 @@ def create_schema():
         with get_conn() as conn, conn.cursor() as cur:
             # Create the schema
             cur.execute("""
+                -- Add pgcrypto
+                CREATE EXTENSION IF NOT EXISTS pgcrypto;
+                        
                 CREATE TABLE IF NOT EXISTS hotel_rooms (
                     id SERIAL PRIMARY KEY,
                     room_number INT NOT NULL UNIQUE,
@@ -23,7 +26,8 @@ def create_schema():
                     lastname VARCHAR(100) NOT NULL,
                     address VARCHAR(255)
                     );
-                        
+                ALTER TABLE hotel_guests ADD COLUMN IF NOT EXISTS api_key VARCHAR DEFAULT encode(gen_random_bytes(32), 'hex');
+                
                 CREATE TABLE IF NOT EXISTS hotel_bookings (
                     id SERIAL PRIMARY KEY,
                     guest_id INT NOT NULL,
@@ -44,24 +48,5 @@ def create_schema():
                         
                     CONSTRAINT valid_date CHECK (dateto > datefrom)
                     )""")
-           
-            # insert sample data
-            cur.execute("""
-                -- Rooms
-                INSERT INTO hotel_rooms (room_number, type, price) VALUES
-                (101, 'single', 80.00),
-                (102, 'double', 120.00),
-                (201, 'suite', 250.00);
-
-                -- Guests
-                INSERT INTO hotel_guests (firstname, lastname, address) VALUES
-                ('John', 'Doe', '123 Main St'),
-                ('Jane', 'Smith', '456 Oak Ave');
-
-                -- Bookings
-                INSERT INTO hotel_bookings (guest_id, room_id, datefrom, dateto, addinfo) VALUES
-                (1, 1, '2026-04-10', '2026-04-15', 'Late arrival'),
-                (2, 2, '2026-05-01', '2026-05-05', NULL)""")
-
     except Exception as e:
         print(f"Error while creating schema: {e}")
